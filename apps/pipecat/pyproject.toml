@@ -1,0 +1,26 @@
+[project]
+name = "pipecat-ws"
+version = "0.1.0"
+description = "FastAPI server bridging the echobase frontend to a Pipecat pipeline."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+]
+
+[project.scripts]
+pipecat-ws = "pipecat_ws.main:run"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.6",
+    "pytest>=8",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pipecat_ws"]
