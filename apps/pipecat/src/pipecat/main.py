@@ -36,9 +36,9 @@ def health() -> dict[str, str]:
 
 
 def run() -> None:
-    """Run the dev server. Used by the `pipecat-ws` console script."""
+    """Run the dev server. Used by the `pipecat` console script."""
     uvicorn.run(
-        "pipecat_ws.main:app",
+        "pipecat.main:app",
         host="0.0.0.0",
         port=int(os.environ.get("PORT", "8000")),
         reload=True,
