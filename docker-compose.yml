@@ -56,6 +56,7 @@ services:
     restart: unless-stopped
     environment:
       PORT: 3001
+      DATABASE_URL: postgresql://${POSTGRES_USER:-echobase}:${POSTGRES_PASSWORD:-echobase}@postgres:5432/${POSTGRES_DB:-echobase}
     ports:
       - "3001:3001"
     depends_on:

@@ -1,0 +1,26 @@
+{
+  "name": "@repo/database",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "db:migrate": "tsx src/migrate.ts up",
+    "db:migrate:down": "tsx src/migrate.ts down",
+    "check-types": "tsc --noEmit",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "kysely": "^0.27.4",
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.11.10",
+    "tsx": "^4.19.0",
+    "typescript": "5.9.2"
+  }
+}
