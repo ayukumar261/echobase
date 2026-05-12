@@ -1,0 +1,32 @@
+# Auto-loaded by `docker compose up` for local dev.
+# Switches each app to its `dev` build target, bind-mounts source for hot reload,
+# and uses anonymous volumes to shield container-only artifacts from the host.
+# Skip with: `docker compose -f docker-compose.yml up` (production images).
+services:
+  next-js-app:
+    build:
+      target: dev
+    volumes:
+      - .:/repo
+      - /repo/node_modules
+      - /repo/apps/next-js-app/node_modules
+      - /repo/apps/next-js-app/.next
+    environment:
+      WATCHPACK_POLLING: "true"
+
+  hono-api:
+    build:
+      target: dev
+    volumes:
+      - .:/repo
+      - /repo/node_modules
+      - /repo/apps/hono-api/node_modules
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+
+  pipecat:
+    build:
+      target: dev
+    volumes:
+      - ./apps/pipecat/src:/app/src
+      - ./apps/pipecat/pyproject.toml:/app/pyproject.toml

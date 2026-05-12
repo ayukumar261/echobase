@@ -1,11 +1,14 @@
 .DEFAULT_GOAL := help
-.PHONY: help up down reset logs ps build psql redis-cli
+.PHONY: help up dev prod down reset logs ps build psql redis-cli
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*?## "; printf "Usage: make <target>\n\nTargets:\n"} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-up: ## Build and start the full stack, waiting for healthchecks
-	docker compose up -d --build --wait
+dev: ## Start the stack in dev mode with hot reload (bind-mounts source)
+	docker compose up --build
+
+prod: ## Start the stack with production images (ignores override)
+	docker compose -f docker-compose.yml up -d --build --wait
 
 down: ## Stop and remove containers (volumes preserved)
 	docker compose down
