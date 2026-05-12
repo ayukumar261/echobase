@@ -73,6 +73,8 @@ services:
       context: ./apps/pipecat-ws
       target: prod
     restart: unless-stopped
+    env_file:
+      - ./apps/pipecat-ws/.env
     environment:
       PORT: 8000
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
