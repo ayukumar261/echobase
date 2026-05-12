@@ -67,10 +67,10 @@ services:
       redis:
         condition: service_healthy
 
-  pipecat:
-    container_name: pipecat
+  pipecat-ws:
+    container_name: pipecat-ws
     build:
-      context: ./apps/pipecat
+      context: ./apps/pipecat-ws
       target: prod
     restart: unless-stopped
     environment:

@@ -5,8 +5,13 @@ from __future__ import annotations
 import os
 
 import uvicorn
-from fastapi import FastAPI
+from dotenv import load_dotenv
+from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
+
+load_dotenv()
+
+from .bot import run_bot
 
 app = FastAPI(title="pipecat-ws")
 
@@ -35,10 +40,16 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.websocket("/ws")
+async def websocket_endpoint(ws: WebSocket) -> None:
+    await ws.accept()
+    await run_bot(ws)
+
+
 def run() -> None:
-    """Run the dev server. Used by the `pipecat` console script."""
+    """Run the dev server. Used by the `pipecat-ws` console script."""
     uvicorn.run(
-        "pipecat.main:app",
+        "pipecat_ws.main:app",
         host="0.0.0.0",
         port=int(os.environ.get("PORT", "8000")),
         reload=True,

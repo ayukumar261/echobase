@@ -8,7 +8,7 @@ A [Turborepo](https://turborepo.com) monorepo containing a Next.js web app, a [H
 | ------------- | ---------------------- | ---- |
 | `next-js-app` | Next.js                | 3000 |
 | `hono-api`    | Hono on Node           | 3001 |
-| `pipecat`     | FastAPI + Pipecat      | 8000 |
+| `pipecat-ws`  | FastAPI + Pipecat      | 8000 |
 | `postgres`    | Postgres 16 (alpine)   | 5432 |
 | `redis`       | Redis 7 (alpine), AOF  | 6379 |
 
@@ -67,7 +67,7 @@ Inside the Docker network the apps reach the databases at `postgres:5432` and `r
 apps/
   next-js-app/   # Next.js frontend
   hono-api/      # Hono API server
-  pipecat/       # FastAPI + Pipecat voice service
+  pipecat-ws/    # FastAPI + Pipecat voice service
 docker-compose.yml
 Makefile
 ```

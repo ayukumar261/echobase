@@ -24,9 +24,9 @@ services:
     environment:
       CHOKIDAR_USEPOLLING: "true"
 
-  pipecat:
+  pipecat-ws:
     build:
       target: dev
     volumes:
-      - ./apps/pipecat/src:/app/src
-      - ./apps/pipecat/pyproject.toml:/app/pyproject.toml
+      - ./apps/pipecat-ws/src:/app/src
+      - ./apps/pipecat-ws/pyproject.toml:/app/pyproject.toml
