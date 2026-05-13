@@ -56,6 +56,8 @@ services:
       dockerfile: apps/hono-api/Dockerfile
       target: prod
     restart: unless-stopped
+    env_file:
+      - ./apps/hono-api/.env
     environment:
       PORT: 3001
       DATABASE_URL: postgresql://${POSTGRES_USER:-echobase}:${POSTGRES_PASSWORD:-echobase}@postgres:5432/${POSTGRES_DB:-echobase}

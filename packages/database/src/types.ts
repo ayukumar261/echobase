@@ -5,9 +5,10 @@
  *   type FooRow    = Selectable<DB['foo']>
  *   type FooInsert = Insertable<DB['foo']>
  *   type FooUpdate = Updateable<DB['foo']>
- *
- * Empty for now — populate alongside schema additions.
  */
+
+import type { Selectable, Insertable, Updateable } from "kysely";
+import type { Users } from "./schema.js";
 
 export type {
   Selectable,
@@ -16,3 +17,7 @@ export type {
   ColumnType,
   Generated,
 } from "kysely";
+
+export type UserRow = Selectable<Users>;
+export type UserInsert = Insertable<Users>;
+export type UserUpdate = Updateable<Users>;

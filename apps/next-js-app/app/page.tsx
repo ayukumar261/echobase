@@ -1,87 +1,68 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Mic, Square } from "lucide-react";
-
-import { usePipecat } from "@/lib/usePipecat";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useSWRConfig } from "swr";
+import { LogOut } from "lucide-react";
+import { useUser, USER_KEY } from "@/hooks/useUser";
+import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
-import { Waveform } from "@/components/ui/waveform";
+import { RepositorySelect } from "@/components/RepositorySelect";
 
 export default function Home() {
-  const bot = usePipecat();
-  const [bars, setBars] = useState<number[] | undefined>(undefined);
+  const router = useRouter();
+  const { mutate } = useSWRConfig();
+  const { isLoading, isLoggedIn } = useUser();
+  const [signingOut, setSigningOut] = useState(false);
 
-  const rafRef = useRef<number | null>(null);
-  const { status, getAnalyserData } = bot;
+  // The OAuth callback redirects to `/?login=ok` — refresh the cached user
+  // and strip the query param so a back-nav doesn't re-trigger this.
   useEffect(() => {
-    if (status !== "live") return;
-    let lastEmit = 0;
-    const tick = (t: number) => {
-      if (t - lastEmit > 33) {
-        const data = getAnalyserData();
-        if (data.length > 0) setBars(data);
-        lastEmit = t;
-      }
-      rafRef.current = requestAnimationFrame(tick);
-    };
-    rafRef.current = requestAnimationFrame(tick);
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
-    };
-  }, [status, getAnalyserData]);
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("login") === "ok") {
+      url.searchParams.delete("login");
+      window.history.replaceState({}, "", url.toString());
+      mutate(USER_KEY);
+    }
+  }, [mutate]);
 
-  const isActive = bot.status === "live" || bot.status === "connecting";
+  // Redirect logged-out visitors to /connect.
+  useEffect(() => {
+    if (!isLoading && !isLoggedIn) {
+      router.replace("/connect");
+    }
+  }, [isLoading, isLoggedIn, router]);
+
+  async function handleSignOut() {
+    setSigningOut(true);
+    try {
+      await api.post("/api/user/logout");
+    } finally {
+      await mutate(USER_KEY);
+      setSigningOut(false);
+    }
+  }
+
+  if (isLoading || !isLoggedIn) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-white">
+        <Spinner className="size-5" />
+      </div>
+    );
+  }
 
   return (
-    <main className="relative flex flex-1 flex-col bg-zinc-50 dark:bg-black">
-      <Card className="fixed right-6 bottom-6 w-88 shadow-2xl shadow-black/20 dark:shadow-black/60">
-        <CardContent className="flex flex-col gap-4">
-          <div className="rounded-lg bg-muted/60 px-3 py-6">
-            <Waveform
-              className="w-full"
-              height={120}
-              data={bot.status === "live" ? bars : undefined}
-              barWidth={4}
-              barGap={3}
-              barRadius={2}
-              barCount={48}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Button
-              onClick={() => void bot.connect()}
-              size="lg"
-              disabled={isActive}
-              className="w-full"
-            >
-              {bot.status === "connecting" ? (
-                <Spinner className="size-5" />
-              ) : (
-                <Mic className="size-5" />
-              )}
-              {bot.status === "connecting" ? "Starting…" : "Start"}
-            </Button>
-            <Button
-              onClick={() => void bot.disconnect()}
-              size="lg"
-              variant="destructive"
-              disabled={!isActive}
-              className="w-full"
-            >
-              <Square className="size-5" />
-              Stop
-            </Button>
-          </div>
-          {bot.error ? (
-            <p className="text-center text-xs text-red-600 dark:text-red-400">
-              {bot.error}
-            </p>
-          ) : null}
-        </CardContent>
-      </Card>
-    </main>
+    <nav className="flex items-center justify-between border-b border-foreground/5 px-4 py-3">
+      <RepositorySelect />
+      <Button
+        variant="outline"
+        disabled={signingOut}
+        onClick={handleSignOut}
+      >
+        <LogOut />
+        {signingOut ? "Signing out…" : "Sign out"}
+      </Button>
+    </nav>
   );
 }
