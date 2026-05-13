@@ -12,6 +12,8 @@ import {
   WebSocketTransport,
 } from "@pipecat-ai/websocket-transport";
 
+import { createSession } from "@/lib/session";
+
 export type BotStatus = "idle" | "connecting" | "live" | "error";
 
 export type ServerMessageHandler = (data: unknown) => void;
@@ -22,7 +24,7 @@ export type UsePipecat = {
   isUserSpeaking: boolean;
   isBotSpeaking: boolean;
   isMuted: boolean;
-  connect: () => Promise<void>;
+  connect: (args: { repoFullName: string }) => Promise<void>;
   disconnect: () => Promise<void>;
   setMuted: (muted: boolean) => void;
   toggleMuted: () => void;
@@ -31,9 +33,6 @@ export type UsePipecat = {
   /** Subscribe to RTVI `server-message` events (custom backend-pushed JSON). */
   onServerMessage: (handler: ServerMessageHandler) => () => void;
 };
-
-const DEFAULT_WS_URL =
-  process.env.NEXT_PUBLIC_PIPECAT_WS_URL ?? "ws://localhost:8765/ws";
 
 const BAR_COUNT = 60;
 
@@ -157,114 +156,135 @@ export function usePipecat(): UsePipecat {
     setIsBotSpeaking(false);
   }, [detachAnalyser]);
 
-  const connect = useCallback(async () => {
-    if (clientRef.current) return;
-    setError(null);
-    setStatus("connecting");
+  const connect = useCallback(
+    async ({ repoFullName }: { repoFullName: string }) => {
+      if (clientRef.current) return;
+      setError(null);
+      setStatus("connecting");
 
-    const callbacks: RTVIEventCallbacks = {
-      onTrackStarted: (track: MediaStreamTrack, participant?: Participant) => {
-        const isLocal = participant?.local ?? false;
-        attachAnalyser(track, isLocal ? "local" : "bot");
-      },
-      onTrackStopped: (_track: MediaStreamTrack, participant?: Participant) => {
-        const isLocal = participant?.local ?? false;
-        detachAnalyser(isLocal ? "local" : "bot");
-      },
-      onUserStartedSpeaking: () => {
-        userSpeakingRef.current = true;
-        setIsUserSpeaking(true);
-      },
-      onUserStoppedSpeaking: () => {
-        userSpeakingRef.current = false;
-        setIsUserSpeaking(false);
-      },
-      onBotStartedSpeaking: () => {
-        botSpeakingRef.current = true;
-        setIsBotSpeaking(true);
-      },
-      onBotStoppedSpeaking: () => {
-        botSpeakingRef.current = false;
-        setIsBotSpeaking(false);
-      },
-      onServerMessage: (data: unknown) => {
-        // Backend-pushed structured events (e.g. Advisor fleet activity).
-        // Fan out to all subscribers; isolate handler failures from each other.
-        for (const h of serverMessageHandlersRef.current) {
-          try {
-            h(data);
-          } catch {
-            // Subscriber error shouldn't break the others.
-          }
-        }
-      },
-      onDisconnected: () => {
-        setStatus("idle");
-      },
-      onError: (message) => {
-        setError(
-          String(
-            (message as { data?: { error?: string } })?.data?.error ?? message,
-          ),
-        );
-        setStatus("error");
-      },
-    };
-
-    const client = new PipecatClient({
-      transport: new WebSocketTransport({
-        serializer: new ProtobufFrameSerializer(),
-      }),
-      enableMic: true,
-      enableCam: false,
-      callbacks,
-    });
-    clientRef.current = client;
-
-    try {
-      // Prime the AudioContext on the user-gesture path that triggered connect().
-      ensureAudioContext();
-      await client.connect({ wsUrl: DEFAULT_WS_URL });
-
-      // WebSocketTransport plays bot audio through a WavStreamPlayer that
-      // already owns an AnalyserNode connected to the destination — there's
-      // no remote MediaStreamTrack to attach to. Adopt the SDK's analyser so
-      // getAnalyserData() can read the bot side when it's speaking.
+      let wsUrl: string;
       try {
-        const transport = (
-          client as unknown as {
-            transport?: {
-              _mediaManager?: {
-                _wavStreamPlayer?: {
-                  connect?: () => Promise<unknown>;
-                  analyser?: AnalyserNode;
-                };
-              };
-            };
-          }
-        ).transport;
-        const player = transport?._mediaManager?._wavStreamPlayer;
-        if (player) {
-          // connect() is idempotent and builds the graph if it hasn't been
-          // primed by the first audio frame yet.
-          await player.connect?.();
-          if (player.analyser) {
-            botAnalyserRef.current = player.analyser;
-          }
-        }
-      } catch {
-        // Non-fatal: bot-side waveform falls back to local mic.
+        const session = await createSession(repoFullName);
+        wsUrl = session.wsUrl;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setError(msg);
+        setStatus("error");
+        return;
       }
 
-      setStatus("live");
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setError(msg);
-      setStatus("error");
-      clientRef.current = null;
-      await teardown();
-    }
-  }, [attachAnalyser, detachAnalyser, ensureAudioContext, teardown]);
+      const callbacks: RTVIEventCallbacks = {
+        onTrackStarted: (
+          track: MediaStreamTrack,
+          participant?: Participant,
+        ) => {
+          const isLocal = participant?.local ?? false;
+          attachAnalyser(track, isLocal ? "local" : "bot");
+        },
+        onTrackStopped: (
+          _track: MediaStreamTrack,
+          participant?: Participant,
+        ) => {
+          const isLocal = participant?.local ?? false;
+          detachAnalyser(isLocal ? "local" : "bot");
+        },
+        onUserStartedSpeaking: () => {
+          userSpeakingRef.current = true;
+          setIsUserSpeaking(true);
+        },
+        onUserStoppedSpeaking: () => {
+          userSpeakingRef.current = false;
+          setIsUserSpeaking(false);
+        },
+        onBotStartedSpeaking: () => {
+          botSpeakingRef.current = true;
+          setIsBotSpeaking(true);
+        },
+        onBotStoppedSpeaking: () => {
+          botSpeakingRef.current = false;
+          setIsBotSpeaking(false);
+        },
+        onServerMessage: (data: unknown) => {
+          // Backend-pushed structured events (e.g. Advisor fleet activity).
+          // Fan out to all subscribers; isolate handler failures from each other.
+          for (const h of serverMessageHandlersRef.current) {
+            try {
+              h(data);
+            } catch {
+              // Subscriber error shouldn't break the others.
+            }
+          }
+        },
+        onDisconnected: () => {
+          setStatus("idle");
+        },
+        onError: (message) => {
+          setError(
+            String(
+              (message as { data?: { error?: string } })?.data?.error ??
+                message,
+            ),
+          );
+          setStatus("error");
+        },
+      };
+
+      const client = new PipecatClient({
+        transport: new WebSocketTransport({
+          serializer: new ProtobufFrameSerializer(),
+        }),
+        enableMic: true,
+        enableCam: false,
+        callbacks,
+      });
+      clientRef.current = client;
+
+      try {
+        // Prime the AudioContext on the user-gesture path that triggered connect().
+        ensureAudioContext();
+        await client.connect({ wsUrl });
+
+        // WebSocketTransport plays bot audio through a WavStreamPlayer that
+        // already owns an AnalyserNode connected to the destination — there's
+        // no remote MediaStreamTrack to attach to. Adopt the SDK's analyser so
+        // getAnalyserData() can read the bot side when it's speaking.
+        try {
+          const transport = (
+            client as unknown as {
+              transport?: {
+                _mediaManager?: {
+                  _wavStreamPlayer?: {
+                    connect?: () => Promise<unknown>;
+                    analyser?: AnalyserNode;
+                  };
+                };
+              };
+            }
+          ).transport;
+          const player = transport?._mediaManager?._wavStreamPlayer;
+          if (player) {
+            // connect() is idempotent and builds the graph if it hasn't been
+            // primed by the first audio frame yet.
+            await player.connect?.();
+            if (player.analyser) {
+              botAnalyserRef.current = player.analyser;
+            }
+          }
+        } catch {
+          // Non-fatal: bot-side waveform falls back to local mic.
+        }
+
+        setStatus("live");
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setError(msg);
+        setStatus("error");
+        clientRef.current = null;
+        await teardown();
+      }
+    },
+    [attachAnalyser, detachAnalyser, ensureAudioContext, teardown],
+  );
 
   const disconnect = useCallback(async () => {
     const client = clientRef.current;

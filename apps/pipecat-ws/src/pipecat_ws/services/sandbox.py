@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import re
 import shlex
 from contextlib import asynccontextmanager
 from functools import partial
@@ -42,9 +43,7 @@ class RepoSandbox:
         start = max(1, int(start))
         end = max(start, int(end))
         safe = shlex.quote(path)
-        return await self._run(
-            f"cd {REPO_PATH} && sed -n '{start},{end}p' -- {safe}"
-        )
+        return await self._run(f"cd {REPO_PATH} && sed -n '{start},{end}p' -- {safe}")
 
     async def grep(self, pattern: str, path: str = ".") -> str:
         safe_pat = shlex.quote(pattern)
@@ -63,7 +62,9 @@ async def open_repo_sandbox(repo_url: str):
     sbx: Sandbox = await asyncio.to_thread(
         partial(Sandbox.create, timeout=SANDBOX_TIMEOUT_S)
     )
-    log.info("e2b sandbox started id=%s, cloning %s", sbx.sandbox_id, repo_url)
+    # Mask any embedded credential before logging
+    masked = re.sub(r"://[^@/]+@", "://***@", repo_url)
+    log.info("e2b sandbox started id=%s, cloning %s", sbx.sandbox_id, masked)
     try:
         await asyncio.to_thread(
             partial(sbx.git.clone, repo_url, path=REPO_PATH, depth=1, timeout=60)

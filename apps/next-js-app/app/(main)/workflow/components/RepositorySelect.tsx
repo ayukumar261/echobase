@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+
 import { useRepositories, type Repository } from "@/hooks/useRepositories";
 import { useSelectedRepository } from "@/hooks/useSelectedRepository";
 import {
@@ -14,6 +16,19 @@ import { Spinner } from "@/components/ui/spinner";
 export function RepositorySelect() {
   const { repositories, isLoading, error } = useRepositories();
   const { selectedRepository, setSelectedRepository } = useSelectedRepository();
+
+  useEffect(() => {
+    if (isLoading || error) return;
+    if (selectedRepository) return;
+    if (repositories.length === 0) return;
+    setSelectedRepository(repositories[0]);
+  }, [
+    isLoading,
+    error,
+    selectedRepository,
+    repositories,
+    setSelectedRepository,
+  ]);
 
   if (isLoading) {
     return (

@@ -16,9 +16,9 @@ from ..config import (
     EXECUTOR_MODEL,
     EXECUTOR_TIMEOUT_S,
     GATEWAY_BASE_URL,
-    GITHUB_REPO_URL,
 )
 from ..services.sandbox import RepoSandbox, open_repo_sandbox
+from ..services.session import SessionInfo
 
 log = logging.getLogger(__name__)
 
@@ -199,15 +199,26 @@ async def _run_research_loop(repo: RepoSandbox, system: str, user: str) -> str:
         step += 1
 
 
-async def run_executor(role: str, task: str, context: str = "") -> str:
+def _authed_clone_url(session: SessionInfo) -> str:
+    prefix = "https://"
+    if not session.clone_url.startswith(prefix):
+        return session.clone_url
+    return f"{prefix}x-access-token:{session.access_token}@{session.clone_url[len(prefix) :]}"
+
+
+async def run_executor(
+    role: str,
+    task: str,
+    context: str = "",
+    *,
+    session: SessionInfo,
+) -> str:
     user = task if not context else f"Context:\n{context}\n\nTask:\n{task}"
-    repo_url = GITHUB_REPO_URL or None
-    if not repo_url:
-        return "[executor error: GITHUB_REPO_URL is not set]"
-    system = _system_prompt(role, repo_url)
+    system = _system_prompt(role, session.repo_full_name)
+    clone_url = _authed_clone_url(session)
 
     try:
-        async with open_repo_sandbox(repo_url) as repo:
+        async with open_repo_sandbox(clone_url) as repo:
             return await asyncio.wait_for(
                 _run_research_loop(repo, system, user),
                 timeout=EXECUTOR_TIMEOUT_S,

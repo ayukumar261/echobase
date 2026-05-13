@@ -28,12 +28,13 @@ from pipecat.transports.websocket.fastapi import (
     FastAPIWebsocketTransport,
 )
 
-from .config import ADVISOR_MODEL, GITHUB_REPO_URL
+from .config import ADVISOR_MODEL
+from .services.session import SessionResolutionError, resolve_session
 from .tools import build_call_advisor, build_call_executor
 
 log = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = (
+BASE_SYSTEM_PROMPT = (
     "You are a friendly voice assistant. Your output is spoken aloud, so "
     "avoid markdown, lists, and any meta references to tools. Never speak "
     "tool names aloud — they are tools, not phrases."
@@ -60,13 +61,14 @@ SYSTEM_PROMPT = (
     "four short, spoken-friendly sentences."
 )
 
-if GITHUB_REPO_URL:
-    # The executor agents have read-only access to a cloned copy of this
-    # repo and can list directories, read files, and grep — so the voice
-    # model should delegate any codebase question rather than refusing.
-    SYSTEM_PROMPT += (
+
+def _build_system_prompt(repo_full_name: str) -> str:
+    """Compose the per-session system prompt. The executor agents have
+    read-only access to a clone of the user's selected repository, so the
+    voice model should delegate codebase questions instead of refusing."""
+    return BASE_SYSTEM_PROMPT + (
         "\n\n"
-        f"A public GitHub repository is connected: {GITHUB_REPO_URL}. "
+        f"A GitHub repository is connected: {repo_full_name}. "
         "Executor agents can clone it into a sandbox and explore its files "
         "(list directories, read files, search for strings). When the user "
         "asks anything about this codebase — what it does, how something is "
@@ -106,8 +108,19 @@ def health() -> dict[str, str]:
 
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket) -> None:
-    """Voice agent pipeline: Deepgram STT -> Vercel AI Gateway LLM -> Cartesia TTS."""
     await ws.accept()
+
+    session_id = ws.query_params.get("session")
+    if not session_id:
+        log.warning("ws connect missing session query param")
+        await ws.close(code=4401)
+        return
+    try:
+        session_info = await resolve_session(session_id)
+    except SessionResolutionError as exc:
+        log.warning("session resolve failed: %s", exc)
+        await ws.close(code=4403)
+        return
 
     transport = FastAPIWebsocketTransport(
         websocket=ws,
@@ -151,13 +164,16 @@ async def websocket_endpoint(ws: WebSocket) -> None:
 
     task_holder: dict[str, PipelineTask] = {}
     tool_fns = [
-        build_call_executor(task_holder),
+        build_call_executor(task_holder, session_info),
         build_call_advisor(task_holder),
     ]
 
     context = LLMContext(
         [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {
+                "role": "system",
+                "content": _build_system_prompt(session_info.repo_full_name),
+            },
             {"role": "user", "content": "Greet the user in one short sentence."},
         ],
         tools=ToolsSchema(standard_tools=[cast(DirectFunction, fn) for fn in tool_fns]),

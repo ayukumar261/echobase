@@ -4,8 +4,6 @@ import os
 
 GATEWAY_BASE_URL = "https://ai-gateway.vercel.sh/v1"
 
-GITHUB_REPO_URL = os.environ.get("GITHUB_REPO_URL", "").strip()
-
 ADVISOR_MODEL = "anthropic/claude-opus-4-7"
 EXECUTOR_MODEL = "anthropic/claude-haiku-4.5"
 

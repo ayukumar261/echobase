@@ -12,6 +12,7 @@ from pipecat.services.llm_service import FunctionCallParams
 
 from ..config import MAX_EXECUTORS_PER_SESSION, MAX_PARALLEL_EXECUTORS
 from ..models import run_executor
+from ..services.session import SessionInfo
 
 log = logging.getLogger(__name__)
 
@@ -20,7 +21,10 @@ def _now_ms() -> int:
     return int(time.time() * 1000)
 
 
-def build_call_executor(task_holder: dict[str, PipelineTask]):
+def build_call_executor(
+    task_holder: dict[str, PipelineTask],
+    session: SessionInfo,
+):
     spawned = 0
     next_id = 0
     semaphore = asyncio.Semaphore(MAX_PARALLEL_EXECUTORS)
@@ -66,7 +70,9 @@ def build_call_executor(task_holder: dict[str, PipelineTask]):
 
         started = _now_ms()
         async with semaphore:
-            result = await run_executor(role=role, task=task, context=context)
+            result = await run_executor(
+                role=role, task=task, context=context, session=session
+            )
         elapsed = _now_ms() - started
 
         is_error = result.startswith("[executor ")
