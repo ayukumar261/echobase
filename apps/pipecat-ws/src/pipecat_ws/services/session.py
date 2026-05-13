@@ -12,7 +12,7 @@ log = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class SessionInfo:
     user_id: str
-    repo_full_name: str
+    repository: str
     clone_url: str
     access_token: str
 
@@ -40,7 +40,7 @@ async def resolve_session(session_id: str) -> SessionInfo:
     body = resp.json()
     return SessionInfo(
         user_id=body["userId"],
-        repo_full_name=body["repoFullName"],
+        repository=body["repository"],
         clone_url=body["cloneUrl"],
         access_token=body["accessToken"],
     )

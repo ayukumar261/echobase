@@ -46,7 +46,13 @@ def build_create_task(
             ) as client:
                 resp = await client.post(
                     f"{api_url}/api/tasks",
-                    json={"task": spec},
+                    json={
+                        "task": spec,
+                        # The coding agent needs to know which repo to clone +
+                        # PR against. The session already carries this from
+                        # when the user picked it in the workflow UI.
+                        "repository": session_info.repository,
+                    },
                 )
         except Exception as exc:  # noqa: BLE001
             log.exception("create_task POST failed")

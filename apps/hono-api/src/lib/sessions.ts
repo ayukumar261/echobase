@@ -4,7 +4,7 @@ const TTL_MS = 2 * 60 * 1000;
 
 export interface SessionRecord {
   userId: string;
-  repoFullName: string;
+  repository: string;
   expiresAt: number;
 }
 
@@ -17,12 +17,12 @@ function gc(): void {
   }
 }
 
-export function createSession(userId: string, repoFullName: string): string {
+export function createSession(userId: string, repository: string): string {
   gc();
   const id = randomBytes(24).toString("base64url");
   sessions.set(id, {
     userId,
-    repoFullName,
+    repository,
     expiresAt: Date.now() + TTL_MS,
   });
   return id;

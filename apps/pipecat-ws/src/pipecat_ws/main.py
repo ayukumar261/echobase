@@ -72,13 +72,13 @@ BASE_SYSTEM_PROMPT = (
 )
 
 
-def _build_system_prompt(repo_full_name: str) -> str:
+def _build_system_prompt(repository: str) -> str:
     """Compose the per-session system prompt. The executor agents have
     read-only access to a clone of the user's selected repository, so the
     voice model should delegate codebase questions instead of refusing."""
     return BASE_SYSTEM_PROMPT + (
         "\n\n"
-        f"A GitHub repository is connected: {repo_full_name}. "
+        f"A GitHub repository is connected: {repository}. "
         "Executor agents can clone it into a sandbox and explore its files "
         "(list directories, read files, search for strings). When the user "
         "asks anything about this codebase — what it does, how something is "
@@ -183,7 +183,7 @@ async def websocket_endpoint(ws: WebSocket) -> None:
         [
             {
                 "role": "system",
-                "content": _build_system_prompt(session_info.repo_full_name),
+                "content": _build_system_prompt(session_info.repository),
             },
             {"role": "user", "content": "Greet the user in one short sentence."},
         ],

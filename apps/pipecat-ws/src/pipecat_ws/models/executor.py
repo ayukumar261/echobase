@@ -214,7 +214,7 @@ async def run_executor(
     session: SessionInfo,
 ) -> str:
     user = task if not context else f"Context:\n{context}\n\nTask:\n{task}"
-    system = _system_prompt(role, session.repo_full_name)
+    system = _system_prompt(role, session.repository)
     clone_url = _authed_clone_url(session)
 
     try:

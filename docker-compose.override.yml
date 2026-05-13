@@ -30,3 +30,10 @@ services:
     volumes:
       - ./apps/pipecat-ws/src:/app/src
       - ./apps/pipecat-ws/pyproject.toml:/app/pyproject.toml
+
+  bullmq-worker:
+    build:
+      target: dev
+    volumes:
+      - ./apps/bullmq-worker/src:/app/src
+      - ./apps/bullmq-worker/pyproject.toml:/app/pyproject.toml

@@ -2,6 +2,7 @@ import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 
+import { internalRoutes } from './routes/internal.js'
 import { repositoriesRoutes } from './routes/repositories.js'
 import { sessionsRoutes } from './routes/sessions.js'
 import { tasksRoutes } from './routes/tasks.js'
@@ -26,6 +27,7 @@ app.route('/api/user/repositories', repositoriesRoutes)
 app.route('/api/user', userRoutes)
 app.route('/api/sessions', sessionsRoutes)
 app.route('/api/tasks', tasksRoutes)
+app.route('/api/internal', internalRoutes)
 
 const port = Number(process.env.PORT ?? 3001)
 serve({ fetch: app.fetch, port }, (info) => {

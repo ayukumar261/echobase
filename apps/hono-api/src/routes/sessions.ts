@@ -15,22 +15,22 @@ sessionsRoutes.post("/", async (c) => {
   const userId = getCookie(c, "user_id");
   if (!userId) return c.json({ error: "unauthenticated" }, 401);
 
-  let body: { repoFullName?: unknown };
+  let body: { repository?: unknown };
   try {
-    body = (await c.req.json()) as { repoFullName?: unknown };
+    body = (await c.req.json()) as { repository?: unknown };
   } catch {
     return c.json({ error: "invalid_json" }, 400);
   }
 
-  const repoFullName = body.repoFullName;
+  const repository = body.repository;
   if (
-    typeof repoFullName !== "string" ||
-    !/^[^/\s]+\/[^/\s]+$/.test(repoFullName)
+    typeof repository !== "string" ||
+    !/^[^/\s]+\/[^/\s]+$/.test(repository)
   ) {
     return c.json({ error: "invalid_repo" }, 400);
   }
 
-  const sessionId = createSession(userId, repoFullName);
+  const sessionId = createSession(userId, repository);
   const url = new URL(pipecatWsUrl());
   url.searchParams.set("session", sessionId);
   return c.json({ sessionId, wsUrl: url.toString() });
@@ -72,8 +72,8 @@ sessionsRoutes.post("/resolve", async (c) => {
   const accessToken = decrypt(row.access_token);
   return c.json({
     userId: rec.userId,
-    repoFullName: rec.repoFullName,
-    cloneUrl: `https://github.com/${rec.repoFullName}.git`,
+    repository: rec.repository,
+    cloneUrl: `https://github.com/${rec.repository}.git`,
     accessToken,
   });
 });

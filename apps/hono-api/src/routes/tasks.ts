@@ -10,9 +10,13 @@ tasksRoutes.post("/", async (c) => {
   const userId = getCookie(c, "user_id");
   if (!userId) return c.json({ error: "unauthenticated" }, 401);
 
-  let body: { task?: unknown };
+  let body: { task?: unknown; repository?: unknown; baseBranch?: unknown };
   try {
-    body = (await c.req.json()) as { task?: unknown };
+    body = (await c.req.json()) as {
+      task?: unknown;
+      repository?: unknown;
+      baseBranch?: unknown;
+    };
   } catch {
     return c.json({ error: "invalid_json" }, 400);
   }
@@ -22,10 +26,31 @@ tasksRoutes.post("/", async (c) => {
     return c.json({ error: "invalid_task" }, 400);
   }
 
+  // `owner/repo` — same shape GitHub uses everywhere. We don't allow slashes in
+  // either segment to keep the worker's clone URL construction trivially safe.
+  const repository = body.repository;
+  if (
+    typeof repository !== "string" ||
+    !/^[^/\s]+\/[^/\s]+$/.test(repository)
+  ) {
+    return c.json({ error: "invalid_repository" }, 400);
+  }
+
+  const baseBranch =
+    typeof body.baseBranch === "string" && body.baseBranch.trim().length > 0
+      ? body.baseBranch.trim()
+      : "main";
+
   const db = getDb();
   const row = await db
     .insertInto("tasks")
-    .values({ user_id: userId, task, status: "pending" })
+    .values({
+      user_id: userId,
+      task,
+      repository,
+      base_branch: baseBranch,
+      status: "pending",
+    })
     .returningAll()
     .executeTakeFirstOrThrow();
 
@@ -36,7 +61,13 @@ tasksRoutes.post("/", async (c) => {
     await Promise.race([
       tasksQueue.add(
         "process",
-        { taskId: row.id, userId },
+        {
+          taskId: row.id,
+          userId,
+          task: row.task,
+          repository: row.repository,
+          baseBranch: row.base_branch,
+        },
         {
           removeOnComplete: true,
           attempts: 3,

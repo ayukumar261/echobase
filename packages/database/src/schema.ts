@@ -35,6 +35,37 @@ export interface Users {
   updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
 }
 
+/**
+ * Lifecycle states for a queued implementation task. Kept in sync with the
+ * CHECK constraint defined in `migrations/0003_tasks.ts` — if you add a value
+ * here, add it there too (and vice versa).
+ */
+export type TaskStatus =
+  | "pending"
+  | "queued"
+  | "running"
+  | "completed"
+  | "failed";
+
+/**
+ * One row per implementation spec submitted by a user. `task` holds the
+ * Markdown spec verbatim; `status` is gated to `TaskStatus` values by a CHECK
+ * constraint at the DB level. Deletion cascades from `users`.
+ */
+export interface Tasks {
+  id: Generated<string>;
+  user_id: string;
+  task: string;
+  /** `owner/repo` — the GitHub repository the worker clones and PRs against. */
+  repository: string;
+  /** Base branch for the draft PR. Defaults to `main` at the DB level. */
+  base_branch: ColumnType<string, string | undefined, string>;
+  status: ColumnType<TaskStatus, TaskStatus | undefined, TaskStatus>;
+  created_at: Generated<Date>;
+  updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
+}
+
 export interface DB {
   users: Users;
+  tasks: Tasks;
 }
