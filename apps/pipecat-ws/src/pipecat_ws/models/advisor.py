@@ -30,10 +30,13 @@ def _get_client() -> AsyncOpenAI:
 
 async def run_advisor(role: str, task: str, context: str = "") -> str:
     system = (
-        f"You are a {role}. Reason carefully about the task you're given. "
-        "Weigh trade-offs, consider edge cases, and produce a clear, "
-        "well-justified answer. Return only the result — no preamble, no "
-        "meta-commentary."
+        f"You are a {role}. Your output is an implementation spec that a "
+        "downstream coding agent will execute directly, so be concrete and "
+        "unambiguous: name the files to touch, the functions or symbols "
+        "involved, the changes to make, and any edge cases or invariants the "
+        "coding agent must preserve. Reason carefully and weigh trade-offs "
+        "where they matter, but commit to one approach. Return only the "
+        "spec — no preamble, no meta-commentary."
     )
     user = task if not context else f"Context:\n{context}\n\nTask:\n{task}"
 

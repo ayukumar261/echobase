@@ -10,6 +10,7 @@ dependencies = [
     "pipecat-ai[deepgram,cartesia,openai,silero,webrtc]>=0.0.95",
     "python-dotenv>=1.0",
     "numpy>=1.26",
+    "e2b>=1.0",
 ]
 
 [project.scripts]

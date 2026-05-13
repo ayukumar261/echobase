@@ -28,7 +28,7 @@ from pipecat.transports.websocket.fastapi import (
     FastAPIWebsocketTransport,
 )
 
-from .config import ADVISOR_MODEL
+from .config import ADVISOR_MODEL, GITHUB_REPO_URL
 from .tools import build_call_advisor, build_call_executor
 
 log = logging.getLogger(__name__)
@@ -59,6 +59,22 @@ SYSTEM_PROMPT = (
     "results return, synthesize them aloud in your own voice in two to "
     "four short, spoken-friendly sentences."
 )
+
+if GITHUB_REPO_URL:
+    # The executor agents have read-only access to a cloned copy of this
+    # repo and can list directories, read files, and grep — so the voice
+    # model should delegate any codebase question rather than refusing.
+    SYSTEM_PROMPT += (
+        "\n\n"
+        f"A public GitHub repository is connected: {GITHUB_REPO_URL}. "
+        "Executor agents can clone it into a sandbox and explore its files "
+        "(list directories, read files, search for strings). When the user "
+        "asks anything about this codebase — what it does, how something is "
+        "implemented, where a feature lives, what's in a directory — "
+        "delegate to one or more executors with a concrete subtask. Do not "
+        "claim you lack access to the code; you have access via the "
+        "executors. Never read the repository URL aloud."
+    )
 
 
 app = FastAPI(title="pipecat-ws")
