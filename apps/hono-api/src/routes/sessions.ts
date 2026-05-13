@@ -71,6 +71,7 @@ sessionsRoutes.post("/resolve", async (c) => {
 
   const accessToken = decrypt(row.access_token);
   return c.json({
+    userId: rec.userId,
     repoFullName: rec.repoFullName,
     cloneUrl: `https://github.com/${rec.repoFullName}.git`,
     accessToken,

@@ -4,6 +4,7 @@ import { cors } from 'hono/cors'
 
 import { repositoriesRoutes } from './routes/repositories.js'
 import { sessionsRoutes } from './routes/sessions.js'
+import { tasksRoutes } from './routes/tasks.js'
 import { userRoutes } from './routes/user.js'
 
 const app = new Hono()
@@ -24,6 +25,7 @@ app.get('/health', (c) => c.json({ status: 'ok' }))
 app.route('/api/user/repositories', repositoriesRoutes)
 app.route('/api/user', userRoutes)
 app.route('/api/sessions', sessionsRoutes)
+app.route('/api/tasks', tasksRoutes)
 
 const port = Number(process.env.PORT ?? 3001)
 serve({ fetch: app.fetch, port }, (info) => {

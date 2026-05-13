@@ -30,7 +30,7 @@ from pipecat.transports.websocket.fastapi import (
 
 from .config import ADVISOR_MODEL
 from .services.session import SessionResolutionError, resolve_session
-from .tools import build_call_advisor, build_call_executor
+from .tools import build_call_advisor, build_call_executor, build_create_task
 
 log = logging.getLogger(__name__)
 
@@ -59,6 +59,16 @@ BASE_SYSTEM_PROMPT = (
     "wording naturally; never go silent after invoking a tool. When the "
     "results return, synthesize them aloud in your own voice in two to "
     "four short, spoken-friendly sentences."
+    "\n\n"
+    "Once the user has converged with you on a concrete change — and only "
+    "then — call `create_task(spec)` with a structured Markdown spec. The "
+    "spec must have sections for Context, Files Affected, Implementation "
+    "Steps, and Acceptance Criteria, and must name the actual files, "
+    "functions, and edits a coding agent will make. Do not call this for "
+    "chitchat, open-ended exploration, or partial ideas; gather context "
+    "with executors and advisors first. The tool returns a task id; speak "
+    "it aloud to the user in one short sentence (e.g. 'queued as task "
+    "abc12345')."
 )
 
 
@@ -166,6 +176,7 @@ async def websocket_endpoint(ws: WebSocket) -> None:
     tool_fns = [
         build_call_executor(task_holder, session_info),
         build_call_advisor(task_holder),
+        build_create_task(task_holder, session_info),
     ]
 
     context = LLMContext(
