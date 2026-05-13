@@ -1,16 +1,14 @@
-"""FastAPI entrypoint for the Pipecat bridge server."""
-
 from __future__ import annotations
 
+import logging
 import os
+from typing import cast
 
 import uvicorn
-from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
-
-load_dotenv()
-
+from pipecat.adapters.schemas.direct_function import DirectFunction
+from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import LLMContextFrame
@@ -30,9 +28,36 @@ from pipecat.transports.websocket.fastapi import (
     FastAPIWebsocketTransport,
 )
 
+from .config import ADVISOR_MODEL
+from .tools import build_call_advisor, build_call_executor
+
+log = logging.getLogger(__name__)
+
 SYSTEM_PROMPT = (
-    "You are a friendly voice assistant. Respond in one or two short sentences. "
-    "Your output is spoken aloud, so avoid markdown or lists."
+    "You are a friendly voice assistant. Your output is spoken aloud, so "
+    "avoid markdown, lists, and any meta references to tools. Never speak "
+    "tool names aloud — they are tools, not phrases."
+    "\n\n"
+    "You have two tools. Use `call_executor(role, task, context)` for "
+    "breadth — call it multiple times in one turn to fan out independent "
+    "sub-tasks in parallel (comparisons across items, multi-part research, "
+    "plans with independent pieces). Use `call_advisor(role, task, "
+    "context)` for depth — a single careful reasoning pass on one "
+    "self-contained problem (weighing close trade-offs, untangling a "
+    "tricky edge case). Pick the one that matches the shape of the "
+    "question; you can also combine them when a question has both breadth "
+    "and a hard core. For simple chitchat or quick factual answers, "
+    "respond directly without calling any tool."
+    "\n\n"
+    "Whenever you invoke a tool, also speak a generous verbal stall "
+    "in the same turn — two or three short sentences that keep the user "
+    "company while the workers run. Acknowledge the question, briefly "
+    "restate what you're looking into, and signal that you're thinking "
+    "(e.g. 'Good question — let me weigh that for a moment. I want to look "
+    "at both sides before I answer. Give me just a second.'). Vary the "
+    "wording naturally; never go silent after invoking a tool. When the "
+    "results return, synthesize them aloud in your own voice in two to "
+    "four short, spoken-friendly sentences."
 )
 
 
@@ -97,8 +122,8 @@ async def websocket_endpoint(ws: WebSocket) -> None:
     llm = OpenAILLMService(
         api_key=os.environ["AI_GATEWAY_API_KEY"],
         base_url="https://ai-gateway.vercel.sh/v1",
-        model="minimax/minimax-m2.7-highspeed",
-        params=OpenAILLMService.InputParams(temperature=0.6, max_tokens=120),
+        model=ADVISOR_MODEL,
+        params=OpenAILLMService.InputParams(temperature=0.6),
     )
 
     tts = CartesiaTTSService(
@@ -108,14 +133,18 @@ async def websocket_endpoint(ws: WebSocket) -> None:
         params=CartesiaTTSService.InputParams(language="en", speed="normal"),
     )
 
-    # Seed a `user` turn so the very first LLM call has something to respond to.
-    # The Vercel AI Gateway / minimax provider rejects requests with only a
-    # system message (error 2013: "messages must not be empty").
+    task_holder: dict[str, PipelineTask] = {}
+    tool_fns = [
+        build_call_executor(task_holder),
+        build_call_advisor(task_holder),
+    ]
+
     context = LLMContext(
         [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": "Greet the user in one short sentence."},
-        ]
+        ],
+        tools=ToolsSchema(standard_tools=[cast(DirectFunction, fn) for fn in tool_fns]),
     )
     context_aggregator = LLMContextAggregatorPair(context)
 
@@ -140,6 +169,13 @@ async def websocket_endpoint(ws: WebSocket) -> None:
         ),
     )
 
+    task_holder["task"] = task
+    for fn in tool_fns:
+        llm.register_direct_function(
+            cast(DirectFunction, fn),
+            cancel_on_interruption=False,
+        )
+
     @transport.event_handler("on_client_connected")
     async def _on_connected(_transport, _client) -> None:
         await task.queue_frames([LLMContextFrame(context=context)])
@@ -152,7 +188,6 @@ async def websocket_endpoint(ws: WebSocket) -> None:
 
 
 def run() -> None:
-    """Run the dev server. Used by the `pipecat-ws` console script."""
     uvicorn.run(
         "pipecat_ws.main:app",
         host="0.0.0.0",
