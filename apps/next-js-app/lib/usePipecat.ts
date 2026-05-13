@@ -41,7 +41,7 @@ const BAR_COUNT = 60
  * The analyser data is read via a ref-backed getter (not React state) so the
  * waveform can poll at rAF cadence without forcing re-renders.
  */
-export function usePipecatBot(): UsePipecatBot {
+export function usePipecat(): UsePipecatBot {
   const [status, setStatus] = useState<BotStatus>("idle")
   const [error, setError] = useState<string | null>(null)
   const [isUserSpeaking, setIsUserSpeaking] = useState(false)
